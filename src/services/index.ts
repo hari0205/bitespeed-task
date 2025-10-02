@@ -7,3 +7,5 @@ export type {
   IdentifyRequest,
   StrategyExecutionResult,
 } from './contact-linking-engine';
+
+export { ContactService } from './contact-service';
