@@ -3,7 +3,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { logger } from '../utils/logger';
 
 /**
@@ -23,7 +23,8 @@ export function requestLogger(
   next: NextFunction
 ): void {
   // Generate or use existing correlation ID
-  const correlationId = (req.headers['x-correlation-id'] as string) || uuidv4();
+  const correlationId =
+    (req.headers['x-correlation-id'] as string) || randomUUID();
   req.correlationId = correlationId;
 
   // Add correlation ID to response headers
