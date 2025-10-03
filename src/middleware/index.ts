@@ -41,3 +41,11 @@ export {
   getAnalyticsStats,
   type AnalyticsData,
 } from './analytics';
+
+export {
+  responseCache,
+  cacheControl,
+  etags,
+  warmCache,
+  invalidateCache,
+} from './caching';

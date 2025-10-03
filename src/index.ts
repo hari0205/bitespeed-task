@@ -16,6 +16,10 @@ import {
   apiVersioning,
   analyticsMiddleware,
   addAnalyticsToHealth,
+  responseCache,
+  cacheControl,
+  etags,
+  invalidateCache,
 } from './middleware';
 import {
   validateEnvironment,
@@ -27,6 +31,7 @@ import {
 } from './config';
 import { createGracefulShutdownManager } from './config/graceful-shutdown';
 import { logger } from './utils/logger';
+import { createHybridCacheService } from './services/hybrid-cache-service';
 
 // Validate environment variables before starting
 validateEnvironment();
@@ -55,6 +60,14 @@ app.use('/api', apiVersioning);
 // Analytics middleware
 app.use(analyticsMiddleware as any);
 app.use(addAnalyticsToHealth);
+
+// Caching middleware
+app.use(etags);
+app.use('/api/v1/health', responseCache({ ttl: 30000 })); // Cache health for 30 seconds
+app.use('/api/v1/health', cacheControl({ maxAge: 30, private: false }));
+
+// Cache invalidation for mutations
+app.use('/api/v1/identify', invalidateCache(['contact']));
 
 // API routes with versioning
 app.use('/api', createRoutes());
@@ -96,6 +109,14 @@ async function startServer(): Promise<void> {
       nodeEnv: config.nodeEnv,
       port: config.port,
       logLevel: config.logLevel,
+    });
+
+    // Initialize hybrid cache service
+    const hybridCache = createHybridCacheService();
+    const cacheStats = await hybridCache.getStats();
+    logger.info('Cache service initialized', {
+      mode: cacheStats.mode,
+      redisAvailable: cacheStats.redisAvailable,
     });
 
     // Run database migrations on startup

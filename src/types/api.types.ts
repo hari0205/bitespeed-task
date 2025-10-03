@@ -49,4 +49,9 @@ export interface HealthResponse {
     connected: boolean;
     message: string;
   };
+  cache?: {
+    hitRate: number;
+    totalEntries: number;
+    memoryUsage: number;
+  };
 }

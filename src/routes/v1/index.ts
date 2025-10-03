@@ -4,7 +4,11 @@
  */
 
 import { Router } from 'express';
-import { IdentifyController, HealthController } from '../../controllers';
+import {
+  IdentifyController,
+  HealthController,
+  CacheController,
+} from '../../controllers';
 import { ContactService } from '../../services';
 import { PrismaContactRepository } from '../../repositories';
 import { ContactLinkingEngine } from '../../services';
@@ -28,6 +32,7 @@ export function createV1Routes(): Router {
   // Initialize controllers
   const identifyController = new IdentifyController(contactService);
   const healthController = new HealthController();
+  const cacheController = new CacheController();
 
   // Version 1 API root endpoint
   router.get('/', (_req, res) => {
@@ -53,6 +58,22 @@ export function createV1Routes(): Router {
     '/identify',
     validateIdentifyRequest,
     asyncHandler(identifyController.identify.bind(identifyController))
+  );
+
+  // Cache management endpoints (for monitoring/admin)
+  router.get(
+    '/cache/stats',
+    asyncHandler(cacheController.getStats.bind(cacheController))
+  );
+
+  router.delete(
+    '/cache/clear',
+    asyncHandler(cacheController.clearCache.bind(cacheController))
+  );
+
+  router.post(
+    '/cache/warm',
+    asyncHandler(cacheController.warmCache.bind(cacheController))
   );
 
   return router;

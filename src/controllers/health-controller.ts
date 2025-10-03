@@ -7,6 +7,7 @@ import { Request, Response } from 'express';
 import { HealthResponse } from '../types/api.types';
 import { checkDatabaseHealth, isDatabaseConnected } from '../config';
 import { logger } from '../utils/logger';
+import { cacheService } from '../services/cache-service';
 
 /**
  * Controller class for health and monitoring endpoints
@@ -36,6 +37,9 @@ export class HealthController {
       const isHealthy = dbHealth.status === 'healthy' && isDbConnected;
       const status = isHealthy ? 'ok' : 'degraded';
 
+      // Get cache statistics
+      const cacheStats = cacheService.getStats();
+
       const healthResponse: HealthResponse = {
         status,
         timestamp: new Date().toISOString(),
@@ -45,6 +49,11 @@ export class HealthController {
           status: dbHealth.status,
           connected: isDbConnected,
           message: dbHealth.message,
+        },
+        cache: {
+          hitRate: cacheStats.total.hitRate,
+          totalEntries: cacheStats.total.entries,
+          memoryUsage: Math.round(cacheStats.total.memoryUsage / 1024), // KB
         },
       };
 

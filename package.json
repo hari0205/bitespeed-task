@@ -43,6 +43,7 @@
     "express": "^5.1.0",
     "express-rate-limit": "^8.1.0",
     "helmet": "^8.1.0",
+    "ioredis": "^5.8.0",
     "uuid": "^13.0.0",
     "winston": "^3.18.3",
     "zod": "^4.1.11"
@@ -51,6 +52,7 @@
     "@types/autocannon": "^7.12.7",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
+    "@types/ioredis": "^5.0.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^24.6.2",
     "@types/supertest": "^6.0.3",

@@ -20,6 +20,8 @@ import {
   handleDatabaseOperation,
   createErrorContext,
 } from '../utils/error-utils';
+import { cacheService } from './cache-service';
+import { logger } from '../utils/logger';
 
 /**
  * Contact Service class responsible for orchestrating contact identification,
@@ -49,6 +51,21 @@ export class ContactService {
           );
         }
 
+        // Generate cache key for this request
+        const cacheKey = this.generateCacheKey(request);
+
+        // Try to get cached result first
+        const cachedResult = cacheService.getCachedContact(cacheKey);
+        if (cachedResult) {
+          logger.debug('Contact identification cache hit', {
+            correlationId,
+            cacheKey,
+            email: request.email,
+            phoneNumber: request.phoneNumber,
+          });
+          return cachedResult;
+        }
+
         // Find existing contacts that match the provided email or phone number
         const existingContacts = await handleDatabaseOperation(
           () =>
@@ -75,7 +92,18 @@ export class ContactService {
         );
 
         // Format and return the response
-        return this.formatIdentifyResponse(result);
+        const response = this.formatIdentifyResponse(result);
+
+        // Cache the result for future requests (5 minutes TTL)
+        cacheService.cacheContact(cacheKey, response, 300000);
+
+        logger.debug('Contact identification result cached', {
+          correlationId,
+          cacheKey,
+          primaryContactId: response.contact.primaryContactId,
+        });
+
+        return response;
       },
       'identifyContact',
       correlationId
@@ -286,5 +314,14 @@ export class ContactService {
     }
 
     return phoneNumbers;
+  }
+
+  /**
+   * Generate cache key for contact identification request
+   */
+  private generateCacheKey(request: IdentifyRequest): string {
+    const email = request.email?.toLowerCase().trim() || '';
+    const phone = request.phoneNumber?.replace(/\s+/g, '') || '';
+    return `contact:identify:${email}:${phone}`;
   }
 }
