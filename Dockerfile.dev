@@ -1,0 +1,32 @@
+# Development Dockerfile with hot reload
+FROM node:18-alpine
+
+# Install dumb-init for proper signal handling
+RUN apk add --no-cache dumb-init
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package.json yarn.lock ./
+
+# Install all dependencies (including dev dependencies)
+RUN yarn install --frozen-lockfile
+
+# Copy source code
+COPY . .
+
+# Generate Prisma client
+RUN yarn db:generate
+
+# Create data directory
+RUN mkdir -p /app/data
+
+# Expose port and debug port
+EXPOSE 3000 9229
+
+# Use dumb-init to handle signals properly
+ENTRYPOINT ["dumb-init", "--"]
+
+# Start development server with hot reload
+CMD ["yarn", "dev"]

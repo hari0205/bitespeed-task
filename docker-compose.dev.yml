@@ -1,0 +1,68 @@
+version: "3.8"
+
+services:
+  # Development API with hot reload
+  api-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: identity-api-dev
+    ports:
+      - "3000:3000"
+      - "9229:9229" # Debug port
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - LOG_LEVEL=debug
+      - DATABASE_URL=file:./data/dev.db
+      - USE_REDIS=true
+      - REDIS_URL=redis://redis:6379
+      - REDIS_KEY_PREFIX=identity-api-dev:
+      - CORS_ORIGIN=*
+      - RATE_LIMIT_WINDOW_MS=900000
+      - RATE_LIMIT_MAX_REQUESTS=100
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - ./data:/app/data
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - identity-network
+    command: yarn dev
+
+  # Redis for development
+  redis:
+    image: redis:7-alpine
+    container_name: identity-redis-dev
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-dev-data:/data
+    restart: unless-stopped
+    networks:
+      - identity-network
+
+  # Redis Commander for development
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: identity-redis-ui-dev
+    ports:
+      - "8081:8081"
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - identity-network
+
+volumes:
+  redis-dev-data:
+    driver: local
+
+networks:
+  identity-network:
+    driver: bridge
