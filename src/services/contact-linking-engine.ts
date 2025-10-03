@@ -72,7 +72,8 @@ export class ContactLinkingEngine {
   async executeStrategy(
     strategy: ContactLinkingStrategy,
     existingContacts: Contact[],
-    request: IdentifyRequest
+    request: IdentifyRequest,
+    _correlationId?: string
   ): Promise<StrategyExecutionResult> {
     switch (strategy) {
       case ContactLinkingStrategy.CREATE_NEW_PRIMARY:

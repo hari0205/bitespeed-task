@@ -5,6 +5,7 @@
 
 import { Request, Response } from 'express';
 import { HealthResponse } from '../types/api.types';
+import { checkDatabaseHealth, isDatabaseConnected } from '../config';
 import { logger } from '../utils/logger';
 
 /**
@@ -27,19 +28,36 @@ export class HealthController {
     try {
       const uptime = Math.floor((Date.now() - this.startTime) / 1000);
 
+      // Check database health
+      const dbHealth = await checkDatabaseHealth();
+      const isDbConnected = isDatabaseConnected();
+
+      // Determine overall health status
+      const isHealthy = dbHealth.status === 'healthy' && isDbConnected;
+      const status = isHealthy ? 'ok' : 'degraded';
+
       const healthResponse: HealthResponse = {
-        status: 'ok',
+        status,
         timestamp: new Date().toISOString(),
         uptime,
         version: process.env['npm_package_version'] || '1.0.0',
+        database: {
+          status: dbHealth.status,
+          connected: isDbConnected,
+          message: dbHealth.message,
+        },
       };
 
       logger.debug('Health check requested', {
         correlationId,
         uptime,
+        databaseStatus: dbHealth.status,
+        databaseConnected: isDbConnected,
       });
 
-      res.status(200).json(healthResponse);
+      // Return 200 for ok, 503 for degraded/error
+      const statusCode = status === 'ok' ? 200 : 503;
+      res.status(statusCode).json(healthResponse);
     } catch (error) {
       logger.error('Health check failed', {
         correlationId,
@@ -53,6 +71,11 @@ export class HealthController {
         status: 'error',
         timestamp: new Date().toISOString(),
         uptime: Math.floor((Date.now() - this.startTime) / 1000),
+        database: {
+          status: 'unhealthy',
+          connected: false,
+          message: 'Health check failed',
+        },
       };
 
       res.status(503).json(errorResponse);

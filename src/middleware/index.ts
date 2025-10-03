@@ -24,3 +24,20 @@ export {
   rateLimiter,
   requestSizeLimit,
 } from './security';
+
+export {
+  apiVersioning,
+  validateApiVersion,
+  getApiVersion,
+  SUPPORTED_VERSIONS,
+  DEFAULT_VERSION,
+  type ApiVersion,
+  type VersionedRequest,
+} from './versioning';
+
+export {
+  analyticsMiddleware,
+  addAnalyticsToHealth,
+  getAnalyticsStats,
+  type AnalyticsData,
+} from './analytics';

@@ -11,6 +11,9 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "test:performance": "jest --testPathPatterns=performance --runInBand --detectOpenHandles",
+    "benchmark": "ts-node src/test/performance/benchmark.ts",
+    "benchmark:quick": "ts-node -e \"process.env.BENCHMARK_QUICK='true'; require('./src/test/performance/benchmark.ts')\"",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
     "format": "prettier --write src/**/*.ts",
@@ -45,6 +48,7 @@
     "zod": "^4.1.11"
   },
   "devDependencies": {
+    "@types/autocannon": "^7.12.7",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/jest": "^30.0.0",
@@ -53,6 +57,8 @@
     "@types/uuid": "^11.0.0",
     "@typescript-eslint/eslint-plugin": "^6.21.0",
     "@typescript-eslint/parser": "^6.21.0",
+    "autocannon": "^8.0.0",
+    "clinic": "^13.0.0",
     "eslint": "^8.57.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.4",

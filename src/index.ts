@@ -13,12 +13,27 @@ import {
   sanitizeHeaders,
   errorHandler,
   notFoundHandler,
+  apiVersioning,
+  analyticsMiddleware,
+  addAnalyticsToHealth,
 } from './middleware';
-import { connectDatabase, disconnectDatabase } from './config/database';
+import {
+  validateEnvironment,
+  getAppConfig,
+  connectDatabase,
+  checkDatabaseHealth,
+  runDatabaseMigrations,
+  generatePrismaClient,
+} from './config';
+import { createGracefulShutdownManager } from './config/graceful-shutdown';
 import { logger } from './utils/logger';
 
+// Validate environment variables before starting
+validateEnvironment();
+
+// Load application configuration
+const config = getAppConfig();
 const app = express();
-const PORT = process.env['PORT'] || 3000;
 
 // Request logging middleware (should be first)
 app.use(requestLogger as any);
@@ -34,68 +49,108 @@ app.use(requestSizeLimit);
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
-// API routes
-app.use('/', createRoutes());
+// API versioning middleware
+app.use('/api', apiVersioning);
 
-// Root endpoint for basic API information
+// Analytics middleware
+app.use(analyticsMiddleware as any);
+app.use(addAnalyticsToHealth);
+
+// API routes with versioning
+app.use('/api', createRoutes());
+
+// Root endpoint for API information
 app.get('/', (_req, res) => {
   res.status(200).json({
     message: 'Identity Reconciliation API',
     version: '1.0.0',
+    apiVersions: {
+      v1: '/api/v1',
+      current: '/api/v1',
+      latest: '/api/v1',
+    },
     endpoints: {
-      health: 'GET /health',
-      identify: 'POST /identify',
+      health: 'GET /api/v1/health',
+      identify: 'POST /api/v1/identify',
+    },
+    documentation: {
+      note: 'All endpoints are available at both /api/v1/* and /api/* (current version)',
+      examples: {
+        versioned: 'POST /api/v1/identify',
+        unversioned: 'POST /api/identify (redirects to current version)',
+      },
     },
   });
 });
 
 // Error handling middleware (should be last)
 app.use(notFoundHandler);
-app.use(errorHandler);
+app.use(errorHandler as any);
 
 /**
  * Start the application server
  */
 async function startServer(): Promise<void> {
   try {
+    logger.info('Starting Identity Reconciliation API server', {
+      nodeEnv: config.nodeEnv,
+      port: config.port,
+      logLevel: config.logLevel,
+    });
+
+    // Run database migrations on startup
+    await runDatabaseMigrations();
+
+    // Generate Prisma client to ensure it's up to date (optional in development)
+    try {
+      await generatePrismaClient();
+    } catch (error) {
+      logger.warn(
+        'Prisma client generation failed, continuing with existing client',
+        {
+          error: error instanceof Error ? error.message : error,
+        }
+      );
+    }
+
     // Connect to database
     await connectDatabase();
 
+    // Verify database health
+    const dbHealth = await checkDatabaseHealth();
+    if (dbHealth.status === 'unhealthy') {
+      throw new Error(`Database health check failed: ${dbHealth.message}`);
+    }
+
     // Start HTTP server
-    const server = app.listen(PORT, () => {
-      logger.info(`Identity Reconciliation API server started`, {
-        port: PORT,
-        environment: process.env['NODE_ENV'] || 'development',
+    const server = app.listen(config.port, () => {
+      logger.info('Identity Reconciliation API server started successfully', {
+        port: config.port,
+        environment: config.nodeEnv,
         timestamp: new Date().toISOString(),
+        databaseStatus: dbHealth.status,
       });
     });
 
-    // Graceful shutdown handling
-    const gracefulShutdown = async (signal: string) => {
-      logger.info(`${signal} received, shutting down gracefully`);
+    // Initialize graceful shutdown manager
+    const shutdownManager = createGracefulShutdownManager({
+      gracefulTimeoutMs: 5000,
+      forceTimeoutMs: 10000,
+    });
 
-      server.close(async () => {
-        try {
-          await disconnectDatabase();
-          logger.info('Server closed successfully');
-          process.exit(0);
-        } catch (error) {
-          logger.error('Error during shutdown', { error });
-          process.exit(1);
-        }
-      });
+    shutdownManager.setServer(server);
+    shutdownManager.initialize();
 
-      // Force shutdown after 10 seconds
-      setTimeout(() => {
-        logger.error('Forced shutdown due to timeout');
-        process.exit(1);
-      }, 10000);
-    };
-
-    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+    // Add custom cleanup functions if needed
+    shutdownManager.addCleanupFunction(async () => {
+      logger.info('Performing application-specific cleanup');
+      // Add any additional cleanup logic here
+    });
   } catch (error) {
-    logger.error('Failed to start server', { error });
+    logger.error('Failed to start server', {
+      error: error instanceof Error ? error.message : error,
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     process.exit(1);
   }
 }

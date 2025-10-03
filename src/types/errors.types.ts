@@ -93,3 +93,66 @@ export class RateLimitError extends AppError {
     super(message, details);
   }
 }
+
+/**
+ * Error thrown when request timeout occurs
+ */
+export class TimeoutError extends AppError {
+  readonly statusCode = 408;
+  readonly code = 'REQUEST_TIMEOUT';
+
+  constructor(message: string = 'Request timeout', details?: any) {
+    super(message, details);
+  }
+}
+
+/**
+ * Error thrown when request payload is too large
+ */
+export class PayloadTooLargeError extends AppError {
+  readonly statusCode = 413;
+  readonly code = 'PAYLOAD_TOO_LARGE';
+
+  constructor(message: string = 'Request payload too large', details?: any) {
+    super(message, details);
+  }
+}
+
+/**
+ * Error thrown when service is unavailable
+ */
+export class ServiceUnavailableError extends AppError {
+  readonly statusCode = 503;
+  readonly code = 'SERVICE_UNAVAILABLE';
+
+  constructor(
+    message: string = 'Service temporarily unavailable',
+    details?: any
+  ) {
+    super(message, details);
+  }
+}
+
+/**
+ * Error thrown when unauthorized access is attempted
+ */
+export class UnauthorizedError extends AppError {
+  readonly statusCode = 401;
+  readonly code = 'UNAUTHORIZED';
+
+  constructor(message: string = 'Unauthorized access', details?: any) {
+    super(message, details);
+  }
+}
+
+/**
+ * Error thrown when access is forbidden
+ */
+export class ForbiddenError extends AppError {
+  readonly statusCode = 403;
+  readonly code = 'FORBIDDEN';
+
+  constructor(message: string = 'Access forbidden', details?: any) {
+    super(message, details);
+  }
+}

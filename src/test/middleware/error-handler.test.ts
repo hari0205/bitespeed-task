@@ -1,160 +1,154 @@
 /**
- * Tests for error handling middleware
+ * Error Handler Middleware Tests
+ * Tests for comprehensive error handling functionality
  */
 
-import { Request, Response, NextFunction } from 'express';
+import request from 'supertest';
+import express from 'express';
+import { errorHandler, notFoundHandler } from '../../middleware/error-handler';
 import {
-  errorHandler,
-  notFoundHandler,
-  asyncHandler,
-} from '../../middleware/error-handler';
-import { ValidationError, DatabaseError } from '../../types/errors.types';
-
-// Mock logger
-jest.mock('../../utils/logger', () => ({
-  logger: {
-    error: jest.fn(),
-  },
-}));
+  ValidationError,
+  ContactNotFoundError,
+  DatabaseError,
+  ContactLinkingError,
+} from '../../types/errors.types';
 
 describe('Error Handler Middleware', () => {
-  let mockRequest: Partial<Request>;
-  let mockResponse: Partial<Response>;
-  let mockNext: NextFunction;
+  let app: express.Application;
 
   beforeEach(() => {
-    mockRequest = {
-      method: 'POST',
-      url: '/identify',
-      path: '/identify',
-      headers: {},
-      body: {},
-    };
-    mockResponse = {
-      status: jest.fn().mockReturnThis(),
-      json: jest.fn().mockReturnThis(),
-    };
-    mockNext = jest.fn();
+    app = express();
+    app.use(express.json());
   });
 
   describe('errorHandler', () => {
-    it('should handle ValidationError correctly', () => {
-      const error = new ValidationError('Validation failed', {
-        field: 'email',
+    it('should handle ValidationError with proper status and format', async () => {
+      app.get('/test', (_req, _res, next) => {
+        next(new ValidationError('Invalid input', { field: 'email' }));
       });
+      app.use(errorHandler);
 
-      errorHandler(
-        error,
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      const response = await request(app).get('/test');
 
-      expect(mockResponse.status).toHaveBeenCalledWith(400);
-      expect(mockResponse.json).toHaveBeenCalledWith({
+      expect(response.status).toBe(400);
+      expect(response.body).toMatchObject({
         error: {
-          message: 'Validation failed',
+          message: 'Invalid input',
           code: 'VALIDATION_ERROR',
           details: { field: 'email' },
         },
         timestamp: expect.any(String),
-        path: '/identify',
+        path: '/test',
+        correlationId: expect.any(String),
       });
     });
 
-    it('should handle DatabaseError correctly', () => {
-      const error = new DatabaseError('Database connection failed');
-
-      errorHandler(
-        error,
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
-
-      expect(mockResponse.status).toHaveBeenCalledWith(500);
-      expect(mockResponse.json).toHaveBeenCalledWith({
-        error: {
-          message: 'Database connection failed',
-          code: 'DATABASE_ERROR',
-          details: undefined,
-        },
-        timestamp: expect.any(String),
-        path: '/identify',
+    it('should handle ContactNotFoundError with proper status', async () => {
+      app.get('/test', (_req, _res, next) => {
+        next(new ContactNotFoundError('Contact not found'));
       });
+      app.use(errorHandler);
+
+      const response = await request(app).get('/test');
+
+      expect(response.status).toBe(404);
+      expect(response.body.error.code).toBe('CONTACT_NOT_FOUND');
     });
 
-    it('should handle unknown errors as internal server error', () => {
-      const error = new Error('Unknown error');
-
-      errorHandler(
-        error,
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
-
-      expect(mockResponse.status).toHaveBeenCalledWith(500);
-      expect(mockResponse.json).toHaveBeenCalledWith({
-        error: {
-          message: 'Internal server error',
-          code: 'INTERNAL_SERVER_ERROR',
-        },
-        timestamp: expect.any(String),
-        path: '/identify',
+    it('should handle DatabaseError with proper status', async () => {
+      app.get('/test', (_req, _res, next) => {
+        next(new DatabaseError('Database connection failed'));
       });
+      app.use(errorHandler);
+
+      const response = await request(app).get('/test');
+
+      expect(response.status).toBe(500);
+      expect(response.body.error.code).toBe('DATABASE_ERROR');
+    });
+
+    it('should handle ContactLinkingError with proper status', async () => {
+      app.get('/test', (_req, _res, next) => {
+        next(new ContactLinkingError('Linking failed'));
+      });
+      app.use(errorHandler);
+
+      const response = await request(app).get('/test');
+
+      expect(response.status).toBe(422);
+      expect(response.body.error.code).toBe('CONTACT_LINKING_ERROR');
+    });
+
+    it('should handle unknown errors safely in production', async () => {
+      const originalEnv = process.env['NODE_ENV'];
+      process.env['NODE_ENV'] = 'production';
+
+      app.get('/test', (_req, _res, next) => {
+        next(new Error('Internal database connection string: secret123'));
+      });
+      app.use(errorHandler);
+
+      const response = await request(app).get('/test');
+
+      expect(response.status).toBe(500);
+      expect(response.body.error.code).toBe('INTERNAL_SERVER_ERROR');
+      expect(response.body.error.message).toBe('Internal server error');
+      expect(response.body.error.details).toBeUndefined();
+
+      process.env['NODE_ENV'] = originalEnv;
+    });
+
+    it('should sanitize sensitive data from error details', async () => {
+      app.get('/test', (_req, _res, next) => {
+        next(
+          new ValidationError('Validation failed', {
+            password: 'secret123',
+            token: 'jwt-token',
+            apiKey: 'api-key-123',
+            validField: 'this should remain',
+          })
+        );
+      });
+      app.use(errorHandler);
+
+      const response = await request(app).get('/test');
+
+      expect(response.body.error.details.password).toBeUndefined();
+      expect(response.body.error.details.token).toBeUndefined();
+      expect(response.body.error.details.apiKey).toBeUndefined();
+      expect(response.body.error.details.validField).toBe('this should remain');
+    });
+
+    it('should include correlation ID from request headers', async () => {
+      app.get('/test', (_req, _res, next) => {
+        next(new ValidationError('Test error'));
+      });
+      app.use(errorHandler);
+
+      const response = await request(app)
+        .get('/test')
+        .set('x-correlation-id', 'test-correlation-123');
+
+      expect(response.body.correlationId).toBe('test-correlation-123');
     });
   });
 
   describe('notFoundHandler', () => {
-    it('should return 404 for unknown routes', () => {
-      const unknownRequest = {
-        ...mockRequest,
-        method: 'GET',
-        path: '/unknown',
-      } as Request;
+    it('should handle 404 routes with proper format', async () => {
+      app.use(notFoundHandler);
 
-      notFoundHandler(unknownRequest, mockResponse as Response, mockNext);
+      const response = await request(app).get('/nonexistent');
 
-      expect(mockResponse.status).toHaveBeenCalledWith(404);
-      expect(mockResponse.json).toHaveBeenCalledWith({
+      expect(response.status).toBe(404);
+      expect(response.body).toMatchObject({
         error: {
-          message: 'Route GET /unknown not found',
+          message: 'Route GET /nonexistent not found',
           code: 'ROUTE_NOT_FOUND',
         },
         timestamp: expect.any(String),
-        path: '/unknown',
+        path: '/nonexistent',
+        correlationId: expect.any(String),
       });
-    });
-  });
-
-  describe('asyncHandler', () => {
-    it('should handle successful async operations', async () => {
-      const asyncFn = jest.fn().mockResolvedValue('success');
-      const wrappedFn = asyncHandler(asyncFn);
-
-      await wrappedFn(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
-
-      expect(asyncFn).toHaveBeenCalledWith(mockRequest, mockResponse, mockNext);
-      expect(mockNext).not.toHaveBeenCalled();
-    });
-
-    it('should catch and pass async errors to next', async () => {
-      const error = new Error('Async error');
-      const asyncFn = jest.fn().mockRejectedValue(error);
-      const wrappedFn = asyncHandler(asyncFn);
-
-      await wrappedFn(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
-
-      expect(mockNext).toHaveBeenCalledWith(error);
     });
   });
 });

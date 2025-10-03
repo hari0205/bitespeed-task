@@ -23,7 +23,10 @@ export class IdentifyController {
     req: Request<{}, IdentifyResponse, ValidatedIdentifyRequest>,
     res: Response<IdentifyResponse>
   ): Promise<void> {
-    const correlationId = req.headers['x-correlation-id'] || 'unknown';
+    const correlationId =
+      (req.headers['x-correlation-id'] as string) ||
+      `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
     const identifyRequest: IdentifyRequest = {};
 
     if (req.body.email) {
@@ -41,32 +44,23 @@ export class IdentifyController {
       },
     });
 
-    try {
-      // Process the identification request through the service layer
-      const result = await this.contactService.identifyContact(identifyRequest);
+    // Process the identification request through the service layer
+    // Error handling is done by the global error handler middleware
+    const result = await this.contactService.identifyContact(
+      identifyRequest,
+      correlationId
+    );
 
-      logger.info('Identify request processed successfully', {
-        correlationId,
-        response: {
-          primaryContactId: result.contact.primaryContactId,
-          emailCount: result.contact.emails.length,
-          phoneNumberCount: result.contact.phoneNumbers.length,
-          secondaryContactCount: result.contact.secondaryContactIds.length,
-        },
-      });
+    logger.info('Identify request processed successfully', {
+      correlationId,
+      response: {
+        primaryContactId: result.contact.primaryContactId,
+        emailCount: result.contact.emails.length,
+        phoneNumberCount: result.contact.phoneNumbers.length,
+        secondaryContactCount: result.contact.secondaryContactIds.length,
+      },
+    });
 
-      res.status(200).json(result);
-    } catch (error) {
-      logger.error('Error processing identify request', {
-        correlationId,
-        error: {
-          name: error instanceof Error ? error.name : 'Unknown',
-          message: error instanceof Error ? error.message : 'Unknown error',
-        },
-      });
-
-      // Re-throw the error to be handled by the global error handler
-      throw error;
-    }
+    res.status(200).json(result);
   }
 }

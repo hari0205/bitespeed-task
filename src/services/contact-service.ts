@@ -10,6 +10,16 @@ import {
   ContactLinkingEngine,
   StrategyExecutionResult,
 } from './contact-linking-engine';
+import {
+  ValidationError,
+  ContactNotFoundError,
+  ContactLinkingError,
+} from '../types/errors.types';
+import {
+  handleServiceOperation,
+  handleDatabaseOperation,
+  createErrorContext,
+} from '../utils/error-utils';
 
 /**
  * Contact Service class responsible for orchestrating contact identification,
@@ -25,34 +35,51 @@ export class ContactService {
    * Main method for identifying and linking contacts based on email/phone
    * Implements the core business logic for the /identify endpoint
    */
-  async identifyContact(request: IdentifyRequest): Promise<IdentifyResponse> {
-    // Validate that at least one contact method is provided
-    if (!request.email && !request.phoneNumber) {
-      throw new Error('Either email or phoneNumber must be provided');
-    }
+  async identifyContact(
+    request: IdentifyRequest,
+    correlationId?: string
+  ): Promise<IdentifyResponse> {
+    return handleServiceOperation(
+      async () => {
+        // Validate that at least one contact method is provided
+        if (!request.email && !request.phoneNumber) {
+          throw new ValidationError(
+            'Either email or phoneNumber must be provided',
+            createErrorContext('identifyContact', correlationId, { request })
+          );
+        }
 
-    // Find existing contacts that match the provided email or phone number
-    const existingContacts =
-      await this.contactRepository.findByEmailOrPhoneNumber(
-        request.email,
-        request.phoneNumber
-      );
+        // Find existing contacts that match the provided email or phone number
+        const existingContacts = await handleDatabaseOperation(
+          () =>
+            this.contactRepository.findByEmailOrPhoneNumber(
+              request.email,
+              request.phoneNumber
+            ),
+          'findByEmailOrPhoneNumber',
+          correlationId
+        );
 
-    // Determine the appropriate linking strategy
-    const strategy = this.contactLinkingEngine.determineContactStrategy(
-      existingContacts,
-      request
+        // Determine the appropriate linking strategy
+        const strategy = this.contactLinkingEngine.determineContactStrategy(
+          existingContacts,
+          request
+        );
+
+        // Execute the strategy to get the primary contact and all linked contacts
+        const result = await this.contactLinkingEngine.executeStrategy(
+          strategy,
+          existingContacts,
+          request,
+          correlationId
+        );
+
+        // Format and return the response
+        return this.formatIdentifyResponse(result);
+      },
+      'identifyContact',
+      correlationId
     );
-
-    // Execute the strategy to get the primary contact and all linked contacts
-    const result = await this.contactLinkingEngine.executeStrategy(
-      strategy,
-      existingContacts,
-      request
-    );
-
-    // Format and return the response
-    return this.formatIdentifyResponse(result);
   }
 
   /**
@@ -60,48 +87,98 @@ export class ContactService {
    */
   async createPrimaryContact(
     email?: string,
-    phoneNumber?: string
+    phoneNumber?: string,
+    correlationId?: string
   ): Promise<Contact> {
-    if (!email && !phoneNumber) {
-      throw new Error('Either email or phoneNumber must be provided');
-    }
+    return handleServiceOperation(
+      async () => {
+        if (!email && !phoneNumber) {
+          throw new ValidationError(
+            'Either email or phoneNumber must be provided',
+            createErrorContext('createPrimaryContact', correlationId, {
+              email,
+              phoneNumber,
+            })
+          );
+        }
 
-    const contactData: CreateContactData = {
-      linkPrecedence: LinkPrecedence.PRIMARY,
-    };
+        const contactData: CreateContactData = {
+          linkPrecedence: LinkPrecedence.PRIMARY,
+        };
 
-    if (email) {
-      contactData.email = email;
-    }
+        if (email) {
+          contactData.email = email;
+        }
 
-    if (phoneNumber) {
-      contactData.phoneNumber = phoneNumber;
-    }
+        if (phoneNumber) {
+          contactData.phoneNumber = phoneNumber;
+        }
 
-    return this.contactRepository.create(contactData);
+        return handleDatabaseOperation(
+          () => this.contactRepository.create(contactData),
+          'createPrimaryContact',
+          correlationId
+        );
+      },
+      'createPrimaryContact',
+      correlationId
+    );
   }
 
   /**
    * Helper method to link two contacts by making the secondary contact
    * point to the primary contact
    */
-  async linkContacts(primaryId: number, secondaryId: number): Promise<void> {
-    // Verify that the primary contact exists and is actually primary
-    const primaryContact = await this.contactRepository.findById(primaryId);
-    if (!primaryContact) {
-      throw new Error(`Primary contact with ID ${primaryId} not found`);
-    }
+  async linkContacts(
+    primaryId: number,
+    secondaryId: number,
+    correlationId?: string
+  ): Promise<void> {
+    return handleServiceOperation(
+      async () => {
+        // Verify that the primary contact exists and is actually primary
+        const primaryContact = await handleDatabaseOperation(
+          () => this.contactRepository.findById(primaryId),
+          'findById',
+          correlationId
+        );
 
-    if (primaryContact.linkPrecedence !== LinkPrecedence.PRIMARY) {
-      throw new Error(`Contact with ID ${primaryId} is not a primary contact`);
-    }
+        if (!primaryContact) {
+          throw new ContactNotFoundError(
+            `Primary contact with ID ${primaryId} not found`,
+            createErrorContext('linkContacts', correlationId, {
+              primaryId,
+              secondaryId,
+            })
+          );
+        }
 
-    // Update the secondary contact to link to the primary
-    await this.contactRepository.update(secondaryId, {
-      linkedId: primaryId,
-      linkPrecedence: LinkPrecedence.SECONDARY,
-      updatedAt: new Date(),
-    });
+        if (primaryContact.linkPrecedence !== LinkPrecedence.PRIMARY) {
+          throw new ContactLinkingError(
+            `Contact with ID ${primaryId} is not a primary contact`,
+            createErrorContext('linkContacts', correlationId, {
+              primaryId,
+              secondaryId,
+              actualPrecedence: primaryContact.linkPrecedence,
+            })
+          );
+        }
+
+        // Update the secondary contact to link to the primary
+        await handleDatabaseOperation(
+          () =>
+            this.contactRepository.update(secondaryId, {
+              linkedId: primaryId,
+              linkPrecedence: LinkPrecedence.SECONDARY,
+              updatedAt: new Date(),
+            }),
+          'updateContactLinking',
+          correlationId
+        );
+      },
+      'linkContacts',
+      correlationId
+    );
   }
 
   /**
@@ -109,13 +186,18 @@ export class ContactService {
    */
   async findContactsByEmailOrPhone(
     email?: string,
-    phoneNumber?: string
+    phoneNumber?: string,
+    correlationId?: string
   ): Promise<Contact[]> {
     if (!email && !phoneNumber) {
       return [];
     }
 
-    return this.contactRepository.findByEmailOrPhoneNumber(email, phoneNumber);
+    return handleDatabaseOperation(
+      () => this.contactRepository.findByEmailOrPhoneNumber(email, phoneNumber),
+      'findContactsByEmailOrPhone',
+      correlationId
+    );
   }
 
   /**

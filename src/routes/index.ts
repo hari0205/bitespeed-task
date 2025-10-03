@@ -1,45 +1,22 @@
 /**
- * Route configuration for the Identity Reconciliation API
+ * Main route configuration for the Identity Reconciliation API
+ * Handles API versioning and route delegation
  */
 
 import { Router } from 'express';
-import { IdentifyController, HealthController } from '../controllers';
-import { ContactService } from '../services';
-import { PrismaContactRepository } from '../repositories';
-import { ContactLinkingEngine } from '../services';
-import { validateIdentifyRequest, asyncHandler } from '../middleware';
-import { prisma } from '../config/database';
+import { createV1Routes } from './v1';
 
 /**
- * Creates and configures all application routes
+ * Creates and configures all application routes with versioning
  */
 export function createRoutes(): Router {
   const router = Router();
 
-  // Initialize dependencies
-  const contactRepository = new PrismaContactRepository(prisma);
-  const contactLinkingEngine = new ContactLinkingEngine(contactRepository);
-  const contactService = new ContactService(
-    contactRepository,
-    contactLinkingEngine
-  );
+  // Mount version 1 routes
+  router.use('/v1', createV1Routes());
 
-  // Initialize controllers
-  const identifyController = new IdentifyController(contactService);
-  const healthController = new HealthController();
-
-  // Health check endpoint
-  router.get(
-    '/health',
-    asyncHandler(healthController.health.bind(healthController))
-  );
-
-  // Identity endpoints
-  router.post(
-    '/identify',
-    validateIdentifyRequest,
-    asyncHandler(identifyController.identify.bind(identifyController))
-  );
+  // Default version redirect (optional - redirects /api/identify to /api/v1/identify)
+  router.use('/', createV1Routes());
 
   return router;
 }

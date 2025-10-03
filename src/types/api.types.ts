@@ -33,14 +33,20 @@ export interface ErrorResponse {
   };
   timestamp: string;
   path: string;
+  correlationId?: string;
 }
 
 /**
  * Health check response structure
  */
 export interface HealthResponse {
-  status: 'ok' | 'error';
+  status: 'ok' | 'degraded' | 'error';
   timestamp: string;
   uptime: number;
   version?: string;
+  database?: {
+    status: 'healthy' | 'unhealthy';
+    connected: boolean;
+    message: string;
+  };
 }
