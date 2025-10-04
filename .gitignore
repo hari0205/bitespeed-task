@@ -66,8 +66,8 @@ Thumbs.db
 *.sqlite3
 
 # Prisma
-prisma/migrations/
-!prisma/migrations/.gitkeep
+# prisma/migrations/
+# !prisma/migrations/.gitkeep
 /src/generated/prisma
 
 # Kiro IDE
