@@ -129,16 +129,16 @@ export async function runDatabaseMigrations(): Promise<void> {
     logger.info('Running database migrations...');
 
     if (envConfig.isProduction) {
-      // In production, use prisma migrate deploy for safety
-      const { stdout, stderr } = await execAsync('npx prisma migrate deploy');
+      // In production, use prisma db push for schema sync
+      const { stdout, stderr } = await execAsync('npx prisma db push');
       if (
         stderr &&
         !stderr.includes('warning') &&
         !stderr.includes('Environment variables loaded')
       ) {
-        throw new Error(`Migration stderr: ${stderr}`);
+        throw new Error(`DB push stderr: ${stderr}`);
       }
-      logger.info('Production database migrations completed', {
+      logger.info('Production database schema sync completed', {
         output: stdout,
       });
     } else {
