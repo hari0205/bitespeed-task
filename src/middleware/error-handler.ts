@@ -67,6 +67,9 @@ function checkSuspiciousActivity(
   req: RequestWithCorrelation,
   error: Error
 ): boolean {
+  // Suppress unused parameter warning
+  void error;
+
   const metadata = req.requestMetadata;
   if (!metadata) return false;
 
@@ -103,10 +106,15 @@ function checkRateLimit(req: RequestWithCorrelation): {
     ? parseInt(rateLimitRemaining as string, 10)
     : undefined;
 
-  return {
+  const result: { nearLimit: boolean; remaining?: number } = {
     nearLimit: remaining !== undefined && remaining < 10,
-    remaining,
   };
+
+  if (remaining !== undefined) {
+    result.remaining = remaining;
+  }
+
+  return result;
 }
 
 /**
@@ -153,6 +161,8 @@ export function errorHandler(
   res: Response,
   _next: NextFunction
 ): void {
+  // Suppress unused parameter warning
+  void _next;
   // Generate or extract correlation ID for request tracking
   const correlationId =
     req.correlationId ||

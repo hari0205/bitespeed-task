@@ -50,11 +50,8 @@ function generateCacheKey(req: Request, config?: CacheConfig): string {
 export function responseCache(
   config: CacheConfig = {}
 ): (req: Request, res: Response, next: NextFunction) => void {
-  return (
-    req: RequestWithCorrelation,
-    res: Response,
-    next: NextFunction
-  ): void => {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const correlatedReq = req as RequestWithCorrelation;
     // Skip caching for non-GET requests by default
     if (req.method !== 'GET' && !config.condition) {
       return next();
@@ -79,13 +76,14 @@ export function responseCache(
       }
 
       logger.debug('Cache hit for response', {
-        correlationId: req.correlationId,
+        correlationId: correlatedReq.correlationId,
         cacheKey,
         method: req.method,
         path: req.path,
       });
 
-      return res.status(cached.statusCode).json(cached.body);
+      res.status(cached.statusCode).json(cached.body);
+      return;
     }
 
     // Cache miss - intercept response
@@ -106,7 +104,7 @@ export function responseCache(
         cacheService.cacheQuery(cacheKey, cacheData, config.ttl);
 
         logger.debug('Response cached', {
-          correlationId: req.correlationId,
+          correlationId: correlatedReq.correlationId,
           cacheKey,
           statusCode: res.statusCode,
           ttl: config.ttl,
@@ -138,6 +136,8 @@ export function cacheControl(
   } = {}
 ): (req: Request, res: Response, next: NextFunction) => void {
   return (_req: Request, res: Response, next: NextFunction): void => {
+    // Suppress unused parameter warning
+    void _req;
     const directives: string[] = [];
 
     if (options.noStore) {
@@ -199,6 +199,8 @@ export function warmCache(
   res: Response,
   next: NextFunction
 ): void {
+  // Suppress unused parameter warning
+  void res;
   // Pre-warm cache with health data if it's empty
   if (req.path === '/health') {
     const healthCacheKey = 'health:status';
@@ -219,11 +221,8 @@ export function warmCache(
 export function invalidateCache(
   patterns: string[]
 ): (req: Request, res: Response, next: NextFunction) => void {
-  return (
-    req: RequestWithCorrelation,
-    res: Response,
-    next: NextFunction
-  ): void => {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const correlatedReq = req as RequestWithCorrelation;
     // Invalidate cache after successful mutations
     res.on('finish', () => {
       if (
@@ -245,7 +244,7 @@ export function invalidateCache(
         });
 
         logger.debug('Cache invalidated', {
-          correlationId: req.correlationId,
+          correlationId: correlatedReq.correlationId,
           patterns,
           method: req.method,
           path: req.path,

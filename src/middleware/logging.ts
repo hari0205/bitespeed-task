@@ -58,23 +58,45 @@ function extractClientInfo(req: Request): RequestMetadata {
     ? parseInt(req.headers['content-length'], 10)
     : undefined;
 
-  return {
+  const result: RequestMetadata = {
     ip: req.ip || 'unknown',
     realIp: getRealIp(req),
-    forwardedFor: req.headers['x-forwarded-for'] as string,
-    userAgent: req.headers['user-agent'],
-    referer: req.headers['referer'] || (req.headers['referrer'] as string),
-    origin: req.headers['origin'] as string,
-    contentType: req.headers['content-type'] as string,
-    contentLength: contentLength,
-    acceptLanguage: req.headers['accept-language'] as string,
-    acceptEncoding: req.headers['accept-encoding'] as string,
-    host: req.headers['host'] as string,
     protocol: req.protocol,
     secure: req.secure,
     timestamp: new Date().toISOString(),
-    sessionId: (req.headers['x-session-id'] as string) || req.sessionID,
   };
+
+  // Only add optional properties if they exist
+  const forwardedFor = req.headers['x-forwarded-for'] as string;
+  if (forwardedFor) result.forwardedFor = forwardedFor;
+
+  const userAgent = req.headers['user-agent'];
+  if (userAgent) result.userAgent = userAgent;
+
+  const referer = req.headers['referer'] || (req.headers['referrer'] as string);
+  if (referer) result.referer = referer;
+
+  const origin = req.headers['origin'] as string;
+  if (origin) result.origin = origin;
+
+  const contentType = req.headers['content-type'] as string;
+  if (contentType) result.contentType = contentType;
+
+  if (contentLength !== undefined) result.contentLength = contentLength;
+
+  const acceptLanguage = req.headers['accept-language'] as string;
+  if (acceptLanguage) result.acceptLanguage = acceptLanguage;
+
+  const acceptEncoding = req.headers['accept-encoding'] as string;
+  if (acceptEncoding) result.acceptEncoding = acceptEncoding;
+
+  const host = req.headers['host'] as string;
+  if (host) result.host = host;
+
+  const sessionId = req.headers['x-session-id'] as string;
+  if (sessionId) result.sessionId = sessionId;
+
+  return result;
 }
 
 /**
@@ -124,7 +146,19 @@ function parseUserAgent(userAgent?: string): {
   else if (ua.includes('tablet')) device = 'Tablet';
   else device = 'Desktop';
 
-  return { browser, os, device, isBot };
+  const result: {
+    browser?: string;
+    os?: string;
+    device?: string;
+    isBot?: boolean;
+  } = {};
+
+  if (browser !== undefined) result.browser = browser;
+  if (os !== undefined) result.os = os;
+  if (device !== undefined) result.device = device;
+  if (isBot !== undefined) result.isBot = isBot;
+
+  return result;
 }
 
 /**

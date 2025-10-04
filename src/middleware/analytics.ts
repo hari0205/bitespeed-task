@@ -159,11 +159,21 @@ export function analyticsMiddleware(
       statusCode: res.statusCode,
       responseTime,
       timestamp: new Date().toISOString(),
-      clientInfo: {
-        ip: clientIp,
-        userAgent: metadata?.userAgent,
+      clientInfo: (() => {
+        const info: {
+          ip: string;
+          userAgent?: string;
+          country?: string;
+          city?: string;
+        } = {
+          ip: clientIp,
+        };
+        if (metadata?.userAgent) {
+          info.userAgent = metadata.userAgent;
+        }
         // In production, you might want to add geolocation data here
-      },
+        return info;
+      })(),
       usage,
     };
 

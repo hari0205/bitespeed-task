@@ -110,7 +110,7 @@ function initializeLogger(): winston.Logger {
   // Add file transports for production
   transports.push(...createFileTransports(config));
 
-  return winston.createLogger({
+  const loggerConfig: winston.LoggerOptions = {
     levels: logLevels,
     level: config.level,
     format: winston.format.combine(
@@ -122,24 +122,27 @@ function initializeLogger(): winston.Logger {
       environment: process.env['NODE_ENV'] || 'development',
     },
     transports,
-    // Handle uncaught exceptions and rejections
-    exceptionHandlers:
-      config.enableFile && config.filePath
-        ? [
-            new winston.transports.File({
-              filename: `${config.filePath}/exceptions.log`,
-            }),
-          ]
-        : [],
-    rejectionHandlers:
-      config.enableFile && config.filePath
-        ? [
-            new winston.transports.File({
-              filename: `${config.filePath}/rejections.log`,
-            }),
-          ]
-        : [],
-  });
+    // Only exit on error in production with proper handlers
+    exitOnError: false,
+  };
+
+  // Add exception and rejection handlers only in production
+  if (config.enableFile && config.filePath) {
+    loggerConfig.exceptionHandlers = [
+      new winston.transports.File({
+        filename: `${config.filePath}/exceptions.log`,
+      }),
+    ];
+    loggerConfig.rejectionHandlers = [
+      new winston.transports.File({
+        filename: `${config.filePath}/rejections.log`,
+      }),
+    ];
+    // Only exit on error in production when we have proper handlers
+    loggerConfig.exitOnError = true;
+  }
+
+  return winston.createLogger(loggerConfig);
 }
 
 /**

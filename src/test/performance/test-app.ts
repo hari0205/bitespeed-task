@@ -48,6 +48,6 @@ testApp.get('/', (_req, res) => {
 
 // Error handling middleware (should be last)
 testApp.use(notFoundHandler);
-testApp.use(errorHandler);
+testApp.use(errorHandler as any);
 
 export default testApp;

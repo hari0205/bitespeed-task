@@ -8,10 +8,7 @@ import autocannon from 'autocannon';
 import { PrismaClient } from '@prisma/client';
 import app from '../../index';
 import { Server } from 'http';
-import {
-  PerformanceMonitor,
-  DatabaseQueryMonitor,
-} from './performance-monitor';
+import { PerformanceMonitor } from './performance-monitor';
 
 interface BenchmarkConfig {
   baseUrl: string;
@@ -63,7 +60,6 @@ class PerformanceBenchmark {
   private prisma: PrismaClient;
   private config: BenchmarkConfig;
   private performanceMonitor: PerformanceMonitor;
-  private dbMonitor: DatabaseQueryMonitor;
 
   constructor(config: BenchmarkConfig) {
     this.config = config;
@@ -75,7 +71,6 @@ class PerformanceBenchmark {
       },
     });
     this.performanceMonitor = new PerformanceMonitor();
-    this.dbMonitor = new DatabaseQueryMonitor();
   }
 
   async initialize(): Promise<void> {
@@ -164,8 +159,8 @@ class PerformanceBenchmark {
             mean: result.latency.mean,
             stddev: result.latency.stddev,
             p50: result.latency.p50,
-            p95: result.latency.p95,
-            p99: result.latency.p99,
+            p95: (result.latency as any).p95 || 0,
+            p99: (result.latency as any).p99 || 0,
             max: result.latency.max,
           },
           throughput: {
@@ -222,7 +217,7 @@ class PerformanceBenchmark {
         if (!groups[result.scenario]) {
           groups[result.scenario] = [];
         }
-        groups[result.scenario].push(result);
+        groups[result.scenario]!.push(result);
         return groups;
       },
       {} as Record<string, BenchmarkResult[]>

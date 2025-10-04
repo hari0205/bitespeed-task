@@ -16,7 +16,6 @@ export interface RedisCacheConfig {
   password?: string;
   db?: number;
   keyPrefix?: string;
-  retryDelayOnFailover?: number;
   maxRetriesPerRequest?: number;
   lazyConnect?: boolean;
 }
@@ -34,13 +33,11 @@ export class RedisCacheService {
   };
 
   constructor(config: RedisCacheConfig) {
-    this.redis = new Redis({
+    const redisOptions: any = {
       host: config.host,
       port: config.port,
-      password: config.password,
       db: config.db || 0,
       keyPrefix: config.keyPrefix || 'identity-api:',
-      retryDelayOnFailover: config.retryDelayOnFailover || 100,
       maxRetriesPerRequest: config.maxRetriesPerRequest || 3,
       lazyConnect: config.lazyConnect !== false,
       // Connection timeout
@@ -53,7 +50,14 @@ export class RedisCacheService {
         logger.warn('Redis connection retry', { attempt: times, delay });
         return delay;
       },
-    });
+    };
+
+    // Only add password if it exists
+    if (config.password) {
+      redisOptions.password = config.password;
+    }
+
+    this.redis = new Redis(redisOptions);
 
     this.setupEventHandlers();
   }
@@ -243,7 +247,7 @@ export class RedisCacheService {
         entries = await this.redis.dbsize();
 
         // Get memory usage info
-        const info = await this.redis.memory('usage');
+        const info = await this.redis.memory('STATS');
         memoryUsage = typeof info === 'number' ? info : 0;
       }
 
@@ -336,19 +340,19 @@ export class RedisCacheService {
           const [key, value] = line.split(':');
           switch (key) {
             case 'redis_version':
-              result.version = value;
+              result.version = value || '';
               break;
             case 'redis_mode':
-              result.mode = value;
+              result.mode = value || '';
               break;
             case 'connected_clients':
-              result.connectedClients = parseInt(value, 10);
+              result.connectedClients = parseInt(value || '0', 10);
               break;
             case 'used_memory':
-              result.usedMemory = parseInt(value, 10);
+              result.usedMemory = parseInt(value || '0', 10);
               break;
             case 'total_system_memory':
-              result.totalSystemMemory = parseInt(value, 10);
+              result.totalSystemMemory = parseInt(value || '0', 10);
               break;
           }
         }

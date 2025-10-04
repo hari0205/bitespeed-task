@@ -12,7 +12,7 @@ import { logger } from '../utils/logger';
  */
 export interface HybridCacheConfig {
   useRedis: boolean;
-  redis?: RedisCacheConfig;
+  redis?: RedisCacheConfig | undefined;
   fallbackToMemory: boolean;
   memoryCache?: {
     defaultTtl: number;
@@ -301,10 +301,14 @@ export function createHybridCacheService(): HybridCacheService {
       redisConfig = {
         host: url.hostname,
         port: parseInt(url.port) || 6379,
-        password: url.password || undefined,
         db: url.pathname ? parseInt(url.pathname.slice(1)) : 0,
         keyPrefix: process.env['REDIS_KEY_PREFIX'] || 'identity-api:',
       };
+
+      // Only add password if it exists
+      if (url.password) {
+        redisConfig.password = url.password;
+      }
     } catch (error) {
       logger.error('Invalid Redis URL, falling back to memory cache', {
         redisUrl,
@@ -313,7 +317,7 @@ export function createHybridCacheService(): HybridCacheService {
     }
   }
 
-  return new HybridCacheService({
+  const config: HybridCacheConfig = {
     useRedis,
     redis: redisConfig,
     fallbackToMemory: true,
@@ -321,5 +325,7 @@ export function createHybridCacheService(): HybridCacheService {
       defaultTtl: parseInt(process.env['CACHE_DEFAULT_TTL'] || '300000'),
       maxSize: parseInt(process.env['CACHE_MAX_SIZE'] || '1000'),
     },
-  });
+  };
+
+  return new HybridCacheService(config);
 }

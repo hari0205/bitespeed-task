@@ -71,7 +71,7 @@ export function apiVersioning(
   }
 
   // 4. Check query parameter
-  const versionQuery = req.query.version as string;
+  const versionQuery = req.query['version'] as string;
   if (versionQuery && SUPPORTED_VERSIONS.includes(versionQuery as ApiVersion)) {
     detectedVersion = versionQuery as ApiVersion;
   }
@@ -107,7 +107,7 @@ export function validateApiVersion(
     !versionedReq.apiVersion ||
     !SUPPORTED_VERSIONS.includes(versionedReq.apiVersion)
   ) {
-    return res.status(400).json({
+    res.status(400).json({
       error: {
         message: `Unsupported API version: ${versionedReq.apiVersion}`,
         code: 'UNSUPPORTED_API_VERSION',
@@ -116,6 +116,7 @@ export function validateApiVersion(
       timestamp: new Date().toISOString(),
       path: req.path,
     });
+    return;
   }
 
   next();

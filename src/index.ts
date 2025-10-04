@@ -112,12 +112,21 @@ async function startServer(): Promise<void> {
     });
 
     // Initialize hybrid cache service
-    const hybridCache = createHybridCacheService();
-    const cacheStats = await hybridCache.getStats();
-    logger.info('Cache service initialized', {
-      mode: cacheStats.mode,
-      redisAvailable: cacheStats.redisAvailable,
-    });
+    try {
+      const hybridCache = createHybridCacheService();
+      const cacheStats = await hybridCache.getStats();
+      logger.info('Cache service initialized', {
+        mode: cacheStats.mode,
+        redisAvailable: cacheStats.redisAvailable,
+      });
+    } catch (error) {
+      logger.warn(
+        'Cache service initialization failed, continuing with basic setup',
+        {
+          error: error instanceof Error ? error.message : error,
+        }
+      );
+    }
 
     // Run database migrations on startup
     await runDatabaseMigrations();
