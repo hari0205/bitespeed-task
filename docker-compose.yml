@@ -10,18 +10,18 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NODE_ENV=production
-      - PORT=3000
-      - LOG_LEVEL=info
-      - DATABASE_URL=file:./data/prod.db
-      - USE_REDIS=true
-      - REDIS_URL=redis://redis:6379
-      - REDIS_KEY_PREFIX=identity-api:
-      - CORS_ORIGIN=*
-      - RATE_LIMIT_WINDOW_MS=900000
-      - RATE_LIMIT_MAX_REQUESTS=1000
-      - CACHE_DEFAULT_TTL=300000
-      - CACHE_MAX_SIZE=1000
+      NODE_ENV: production
+      PORT: 3000
+      LOG_LEVEL: info
+      DATABASE_URL: "file:./data/prod.db"
+      USE_REDIS: "true"
+      REDIS_URL: "redis://redis:6379"
+      REDIS_KEY_PREFIX: "identity-api:"
+      CORS_ORIGIN: "*"
+      RATE_LIMIT_WINDOW_MS: 900000
+      RATE_LIMIT_MAX_REQUESTS: 1000
+      CACHE_DEFAULT_TTL: 300000
+      CACHE_MAX_SIZE: 1000
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
@@ -69,9 +69,9 @@ services:
     ports:
       - "8081:8081"
     environment:
-      - REDIS_HOSTS=local:redis:6379
-      - HTTP_USER=admin
-      - HTTP_PASSWORD=admin123
+      REDIS_HOSTS: "local:redis:6379"
+      HTTP_USER: admin
+      HTTP_PASSWORD: admin123
     depends_on:
       - redis
     restart: unless-stopped
