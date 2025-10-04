@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "yarn db:generate && tsc",
-    "start": "prisma migrate deploy && node dist/index.js",
+    "start": "prisma db push && node dist/index.js",
     "railway:build": "yarn db:generate && yarn build",
     "railway:start": "yarn db:migrate && node dist/index.js",
     "dev": "nodemon",
