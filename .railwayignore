@@ -1,0 +1,2 @@
+# Force Railway to use Dockerfile by ignoring package.json detection
+# This prevents Railpack from taking over

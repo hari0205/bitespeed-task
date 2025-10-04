@@ -1,0 +1,9 @@
+[phases.build]
+dependsOn = []
+
+[phases.install]
+dependsOn = []
+
+# Force Railway to use Dockerfile instead of Railpack
+[build]
+dockerfile = "Dockerfile"
