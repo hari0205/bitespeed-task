@@ -13,7 +13,7 @@ const environmentValidationSchema = z.object({
   NODE_ENV: z
     .enum(['development', 'production', 'test'])
     .default('development'),
-  PORT: z.coerce.number().min(1).max(65535).default(3000),
+  PORT: z.coerce.number().min(1).max(65535).default(8080),
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
   CORS_ORIGIN: z.string().default('*'),
