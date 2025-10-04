@@ -153,9 +153,10 @@ async function startServer(): Promise<void> {
     }
 
     // Start HTTP server
-    const server = app.listen(config.port, () => {
+    const server = app.listen(config.port, '0.0.0.0', () => {
       logger.info('Identity Reconciliation API server started successfully', {
         port: config.port,
+        host: '0.0.0.0',
         environment: config.nodeEnv,
         timestamp: new Date().toISOString(),
         databaseStatus: dbHealth.status,
